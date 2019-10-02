@@ -111,7 +111,7 @@ exit status code (an integer number).
 
 Here is an example which lists the command line arguments:
 
-<code c efl_version.c>
+<code c efl_args_1.c>
 #include <stdio.h>
 
 #include <Efl_Core.h>
@@ -145,7 +145,7 @@ Here is now a source code which parse the arguments according to the
 usage of a program. The usage function is at the top of the code, and
 the parsing of options is in ''efl_main''.
 
-<code c efl_version.c>
+<code c efl_args_2.c>
 #include <stdlib.h> /* atoi */
 #include <string.h> /* str(n)cmp */
 #include <stdio.h>
@@ -264,6 +264,70 @@ efl_main(void *data EINA_UNUSED, const Efl_Event *ev)
    printf(" * file    : %s\n", file);
 
    efl_loop_quit(main_loop, eina_value_int_init(99));
+}
+EFL_MAIN();
+</code>
+
+=== Timers ===
+
+Timers can be added to the main loop Eo object using the ''efl_add''
+macro. A callback is then called when an interval of time has elapsed:
+
+    efl_add(EFL_LOOP_TIMER_CLASS, main_loop,
+            efl_loop_timer_interval_set(efl_added, 2.0),
+            efl_event_callback_add(efl_added, EFL_LOOP_TIMER_EVENT_TIMER_TICK, my_cb, data));
+
+Some explanations:
+
+* timers are Eo objects and ''efl_add'' created it and sets it as the
+child of main_loop. The destruction is done automatically when exiting
+the main loop. Each Eo object has a class. Timer's class is
+''EFL_LOOP_TIMER_CLASS''.
+* ''efl_loop_timer_interval_set'' method sets the interval of time at
+the end of which the callback will be called. The special symbol
+''efl_added'' refers to the object being created. It's the analog of
+the **this** pointer in C++ classes.
+* ''efl_event_callback_add'' add a callback for this timer, ''my_cb''
+is the callback name, the last parameter is the data passed to that
+callback.
+
+The declaration of the callbck is the following:
+
+    void my_cb(void *data, const Efl_Event *ev);
+
+Here is a basic example of a timer calling a callback, and which exits
+the program at the third call of the callback:
+
+<code c efl_timer_1.c>
+#include <stdio.h>
+
+#include <Efl_Core.h>
+
+static double initial_time = 0;
+
+static void
+_cb(void *data, const Efl_Event *ev EINA_UNUSED)
+{
+   Eo *main_loop = (Eo*)data;
+
+   double dt = ecore_time_get() - initial_time;
+   printf("%.6f\n", dt);
+   if (dt > 5)
+     efl_loop_quit(main_loop, eina_value_int_init(99));
+}
+
+static EAPI_MAIN void
+efl_main(void * data EINA_UNUSED, const Efl_Event *ev)
+{
+   Eo *main_loop;
+
+   main_loop = ev->object;
+   initial_time = ecore_time_get();
+
+   efl_add(EFL_LOOP_TIMER_CLASS, efl_app_main_get(),
+           efl_loop_timer_interval_set(efl_added, 2.0),
+           efl_event_callback_add(efl_added, EFL_LOOP_TIMER_EVENT_TIMER_TICK,
+                                  _cb, main_loop));
 }
 EFL_MAIN();
 </code>
