@@ -331,3 +331,179 @@ efl_main(void * data EINA_UNUSED, const Efl_Event *ev)
 }
 EFL_MAIN();
 </code>
+
+Here is a rewrite of the file examples/ecore/ecore_timer_example.c
+with the unifies API:
+
+<code c efl_timer_2.c>
+#include <stdio.h>
+
+#include <Efl_Core.h>
+
+#define TIMEOUT_1 1.0  // interval for timer1
+#define TIMEOUT_2 3.0  // timer2 - delay timer1
+#define TIMEOUT_3 8.2  // timer3 - pause timer1
+#define TIMEOUT_4 11.0 // timer4 - resume timer1
+#define TIMEOUT_5 14.0 // timer5 - change interval of timer1
+#define TIMEOUT_6 18.0 // top timer1 and start timer7 and timer8 with changed precision
+#define TIMEOUT_7 1.1  // interval for timer7
+#define TIMEOUT_8 1.2  // interval for timer8
+#define DELAY_1   3.0  // delay time for timer1 - used by timer2
+#define INTERVAL1 2.0  // new interval for timer1 - used by timer5
+
+#define TIMER_ADD(timeout_, cb_) \
+   efl_add(EFL_LOOP_TIMER_CLASS, efl_app_main_get(), \
+           efl_loop_timer_interval_set(efl_added, timeout_), \
+           efl_event_callback_add(efl_added, EFL_LOOP_TIMER_EVENT_TIMER_TICK, \
+                                  cb_, NULL))
+
+static double _initial_time = 0;
+
+static Eo *timer1 = NULL;
+static Eo *timer2 = NULL;
+static Eo *timer3 = NULL;
+static Eo *timer4 = NULL;
+static Eo *timer5 = NULL;
+static Eo *timer6 = NULL;
+static Eo *timer7 = NULL;
+static Eo *timer8 = NULL;
+
+static inline double
+_get_current_time(void)
+{
+   return ecore_time_get() - _initial_time;
+}
+
+static void
+_timer1_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer1 expired after %0.3f seconds.\n", _get_current_time());
+   fflush(stdout);
+}
+
+static void
+_timer2_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer2 expired after %0.3f seconds. "
+          "Adding delay of %0.3f seconds to timer1.\n",
+          _get_current_time(), DELAY_1);
+   fflush(stdout);
+
+   efl_loop_timer_delay(timer1, DELAY_1);
+
+   efl_event_callback_stop(timer2);
+   efl_del(timer2);
+   timer2 = NULL;
+}
+
+static void
+_timer3_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer3 expired after %0.3f seconds. "
+          "Freezing timer1.\n", _get_current_time());
+   fflush(stdout);
+
+   efl_event_freeze(timer1);
+
+   efl_event_callback_stop(timer3);
+   efl_del(timer3);
+   timer3 = NULL;
+}
+
+static void
+_timer4_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer4 expired after %0.3f seconds. "
+          "Resuming timer1, which has %0.3f seconds left to expire.\n",
+          _get_current_time(), efl_loop_timer_time_pending_get(timer1));
+   fflush(stdout);
+
+   efl_event_thaw(timer1);
+
+   efl_event_callback_stop(timer4);
+   efl_del(timer4);
+   timer4 = NULL;
+}
+
+static void
+_timer5_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   double interval = efl_loop_timer_interval_get(timer1);
+
+   printf("Timer5 expired after %0.3f seconds. "
+          "Changing interval of timer1 from %0.3f to %0.3f seconds.\n",
+          _get_current_time(), interval, INTERVAL1);
+   fflush(stdout);
+
+   efl_loop_timer_interval_set(timer1, INTERVAL1);
+
+   efl_event_callback_stop(timer5);
+   efl_del(timer5);
+   timer5 = NULL;
+}
+
+static void
+_timer7_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer7 expired after %0.3f seconds.\n", _get_current_time());
+   fflush(stdout);
+
+   efl_event_callback_stop(timer7);
+   efl_del(timer7);
+   timer7 = NULL;
+}
+
+static void
+_timer8_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer8 expired after %0.3f seconds.\n", _get_current_time());
+   fflush(stdout);
+
+   efl_event_callback_stop(timer8);
+   efl_del(timer8);
+   timer8 = NULL;
+}
+
+static void
+_timer6_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
+{
+   printf("Timer6 expired after %0.3f seconds.\n", _get_current_time());
+   printf("Stopping timer1.\n");
+   fflush(stdout);
+
+   efl_del(timer1);
+   timer1 = NULL;
+
+   printf("Starting timer7 (%0.3fs) and timer8 (%0.3fs).\n",
+          TIMEOUT_7, TIMEOUT_8);
+   fflush(stdout);
+
+   timer7 = TIMER_ADD(TIMEOUT_7, _timer7_cb);
+   timer8 = TIMER_ADD(TIMEOUT_8, _timer8_cb);
+
+   /* FIXME */
+   // ecore_timer_precision_set(0.2);
+
+   efl_event_callback_stop(timer6);
+   efl_del(timer6);
+   timer6 = NULL;
+}
+
+static EAPI_MAIN void
+efl_main(void * data EINA_UNUSED, const Efl_Event *ev)
+{
+
+   _initial_time = ecore_time_get();
+
+   timer1 = TIMER_ADD(TIMEOUT_1, _timer1_cb);
+   timer2 = TIMER_ADD(TIMEOUT_2, _timer2_cb);
+   timer3 = TIMER_ADD(TIMEOUT_3, _timer3_cb);
+   timer4 = TIMER_ADD(TIMEOUT_4, _timer4_cb);
+   timer5 = TIMER_ADD(TIMEOUT_5, _timer5_cb);
+   timer6 = TIMER_ADD(TIMEOUT_6, _timer6_cb);
+
+   printf("start the main loop.\n");
+   fflush(stdout);
+}
+EFL_MAIN();
+</code>
